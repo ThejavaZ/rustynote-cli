@@ -1,7 +1,10 @@
+mod models;
+mod storage;
+
 use std::env;
+use models::{Task, TaskStatus};
 
 fn main() {
-    // Capturamos los argumentos de la línea de comandos en un Vector de Strings
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 2 {
@@ -10,13 +13,10 @@ fn main() {
         return;
     }
 
-    // El primer argumento (índice 1) es el comando
     let command = &args[1];
 
-    // Usamos pattern matching (match), el equivalente ultra potente al switch
     match command.as_str() {
         "add" => {
-            // Verificamos si pasaron el texto de la nota/tarea
             let task_text = match args.get(2) {
                 Some(text) => text,
                 None => {
@@ -24,12 +24,55 @@ fn main() {
                     return;
                 }
             };
-            println!("📝 Agregando tarea: \"{}\"", task_text);
-            // Aquí agregaremos la lógica de guardado más adelante
+
+            // 1. Cargamos las tareas actuales
+            let mut tasks = match storage::load_tasks() {
+                Ok(t) => t,
+                Err(e) => {
+                    println!("❌ Error al cargar las tareas: {}", e);
+                    return;
+                }
+            };
+
+            // 2. Calculamos el nuevo ID (si hay tareas, el último ID + 1, si no, 1)
+            let new_id = tasks.iter().map(|t| t.id).max().unwrap_or(0) + 1;
+
+            // 3. Creamos la nueva tarea
+            let new_task = Task {
+                id: new_id,
+                text: task_text.to_string(),
+                status: TaskStatus::Pending,
+            };
+
+            tasks.push(new_task.clone());
+
+            // 4. Guardamos en el archivo JSON
+            if let Err(e) = storage::save_tasks(&tasks) {
+                println!("❌ Error al guardar la tarea: {}", e);
+                return;
+            }
+
+            println!("✅ Tarea agregada con éxito: [{}] \"{}\"", new_task.id, new_task.text);
         }
         "list" => {
-            println!("📋 Listando todas tus tareas...");
-            // Aquí agregaremos la lógica de lectura del archivo más adelante
+            let tasks = match storage::load_tasks() {
+                Ok(t) => t,
+                Err(e) => {
+                    println!("❌ Error al leer las tareas: {}", e);
+                    return;
+                }
+            };
+
+            if tasks.is_empty() {
+                println!("📭 No hay tareas registradas todavía.");
+                return;
+            }
+
+            println!("\n📋 Tus tareas guardadas:");
+            for task in tasks {
+                println!("  [{}] {} - {}", task.id, task.text, task.status);
+            }
+            println!();
         }
         "help" | "--help" | "-h" => {
             print_help();
