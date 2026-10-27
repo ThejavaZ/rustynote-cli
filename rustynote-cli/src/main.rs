@@ -25,7 +25,6 @@ fn main() {
                 }
             };
 
-            // 1. Cargamos las tareas actuales
             let mut tasks = match storage::load_tasks() {
                 Ok(t) => t,
                 Err(e) => {
@@ -34,10 +33,8 @@ fn main() {
                 }
             };
 
-            // 2. Calculamos el nuevo ID (si hay tareas, el último ID + 1, si no, 1)
             let new_id = tasks.iter().map(|t| t.id).max().unwrap_or(0) + 1;
 
-            // 3. Creamos la nueva tarea
             let new_task = Task {
                 id: new_id,
                 text: task_text.to_string(),
@@ -46,7 +43,6 @@ fn main() {
 
             tasks.push(new_task.clone());
 
-            // 4. Guardamos en el archivo JSON
             if let Err(e) = storage::save_tasks(&tasks) {
                 println!("❌ Error al guardar la tarea: {}", e);
                 return;
@@ -74,6 +70,95 @@ fn main() {
             }
             println!();
         }
+        "done" => {
+            let id_str = match args.get(2) {
+                Some(id) => id,
+                None => {
+                    println!("❌ Error: Debes especificar el ID de la tarea a completar.");
+                    return;
+                }
+            };
+
+            // Parseamos el argumento de texto a u32 de forma segura con match
+            let id: u32 = match id_str.parse() {
+                Ok(num) => num,
+                Err(_) => {
+                    println!("❌ Error: El ID debe ser un número válido.");
+                    return;
+                }
+            };
+
+            let mut tasks = match storage::load_tasks() {
+                Ok(t) => t,
+                Err(e) => {
+                    println!("❌ Error al cargar las tareas: {}", e);
+                    return;
+                }
+            };
+
+            let mut found = false;
+            for task in &mut tasks {
+                if task.id == id {
+                    task.status = TaskStatus::Completed;
+                    found = true;
+                    break;
+                }
+            }
+
+            if !found {
+                println!("❌ Error: No se encontró ninguna tarea con el ID {}", id);
+                return;
+            }
+
+            if let Err(e) = storage::save_tasks(&tasks) {
+                println!("❌ Error al guardar los cambios: {}", e);
+                return;
+            }
+
+            println!("✨ Tarea [{}] marcada como completada.", id);
+        }
+        "delete" => {
+            let id_str = match args.get(2) {
+                Some(id) => id,
+                None => {
+                    println!("❌ Error: Debes especificar el ID de la tarea a eliminar.");
+                    return;
+                }
+            };
+
+            let id: u32 = match id_str.parse() {
+                Ok(num) => num,
+                Err(_) => {
+                    println!("❌ Error: El ID debe ser un número válido.");
+                    return;
+                }
+            };
+
+            let mut tasks = match storage::load_tasks() {
+                Ok(t) => t,
+                Err(e) => {
+                    println!("❌ Error al cargar las tareas: {}", e);
+                    return;
+                }
+            };
+
+            let initial_len = tasks.len();
+            
+            // retained: nos quedamos solo con las tareas que NO coincidan con el ID a eliminar
+            tasks.retain(|t| t.id != id);
+
+            if tasks.len() == initial_len {
+                println!("❌ Error: No se encontró ninguna tarea con el ID {}", id);
+                return;
+            }
+
+            if let Err(e) = storage::save_tasks(&tasks) {
+                println!("❌ Error al guardar los cambios: {}", e);
+                return;
+            }
+
+            println!("🗑️ Tarea [{}] eliminada con éxito.", id);
+        }
         "help" | "--help" | "-h" => {
             print_help();
         }
@@ -86,7 +171,9 @@ fn main() {
 
 fn print_help() {
     println!("\nUsage:");
-    println!("  rustynote-cli add <text>   - Create a new task");
-    println!("  rustynote-cli list         - Show all tasks");
-    println!("  rustynote-cli help         - Show this help message\n");
+    println!("  rustynote-cli add <text>    - Create a new task");
+    println!("  rustynote-cli list          - Show all tasks");
+    println!("  rustynote-cli done <id>     - Mark a task as completed");
+    println!("  rustynote-cli delete <id>   - Delete a task by ID");
+    println!("  rustynote-cli help          - Show this help message\n");
 }
